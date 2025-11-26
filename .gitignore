@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific - EXCLUSIONS
+
+# 1. Output directory (results and crops)
+output/
+
+# 2. Models directory (weights and cache)
+models/*
+!models/README.md
+# Note: models/yolo/ and models/cache/ are ignored by models/*
+
+# 3. Images directory (test images)
+images/*
+!images/README.md
+
+# 4. HuggingFace / Torch Caches (if any local)
+.cache/
+.huggingface/
+
+# System
+.DS_Store
+Thumbs.db

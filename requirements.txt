@@ -1,0 +1,24 @@
+# Bangla OCR Pipeline - Requirements
+
+# Core dependencies
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.37.0
+Pillow>=9.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Qwen model utilities
+qwen-vl-utils>=0.0.1
+
+# ONNX Runtime (CPU-optimized)
+# Use onnxruntime for CPU, onnxruntime-gpu for GPU
+onnxruntime>=1.16.0
+onnx>=1.15.0
+
+# Optional: For better ONNX export
+optimum[exporters]>=1.16.0
+
+# Utilities
+tqdm>=4.65.0
