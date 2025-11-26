@@ -165,12 +165,6 @@ class QwenOCRPyTorch:
             torch.cuda.empty_cache()
             
         return [text.strip() for text in output_texts]
-                    
-            except Exception as e:
-                print(f"⚠ Error processing image {idx}: {e}")
-                results.append("")
-        
-        return results
     
     def offload(self):
         """Offload model from memory."""
