@@ -142,10 +142,23 @@ Examples:
     
     # Validate ONNX backend
     if args.backend == "onnx" and not args.onnx_model:
+        parser.error("--onnx_model is required when using --backend=onnx")
     
-    if not image_files:
-        print("No images found!")
-        return
+    # Create configuration
+    config = OCRConfig(
+        yolo_model_path=args.yolo_model,
+        qwen_model_name=args.model_name,
+        onnx_model_name=args.onnx_model if args.onnx_model else "swapnillo/Bangla-OCR-SFT-ONNX",
+        output_dir=args.output_dir,
+        yolo_confidence=args.confidence,
+        batch_size_gpu=args.batch_size if args.batch_size else 8,
+        batch_size_cpu=args.batch_size if args.batch_size else 4,
+        backend=args.backend,
+    )
+    
+    # Get image files
+    print("Scanning for images...")
+    image_files = get_image_files(args.image)
     
     # Initialize pipeline
     try:
