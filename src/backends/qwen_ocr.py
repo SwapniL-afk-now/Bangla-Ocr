@@ -12,9 +12,9 @@ class QwenOCR:
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen2-VL-2B-Instruct",
+        model_name: str = "swapnillo/Bangla-OCR-SFT",
         backend: Literal["auto", "pytorch", "onnx"] = "auto",
-        onnx_model_path: str = None,
+        onnx_model_name: str = None,
         device: str = "auto",
         cache_dir: str = None
     ):
@@ -22,9 +22,9 @@ class QwenOCR:
         Initialize Qwen OCR with appropriate backend.
         
         Args:
-            model_name: HuggingFace model name
+            model_name: HuggingFace model name (PyTorch)
             backend: Backend to use (auto/pytorch/onnx)
-            onnx_model_path: Path to ONNX model (required if backend=onnx)
+            onnx_model_name: HuggingFace ONNX model name (if using ONNX)
             device: Device to use (auto/cpu/cuda)
             cache_dir: Directory to cache downloaded models
         """
@@ -39,8 +39,8 @@ class QwenOCR:
         
         # Determine backend
         if backend == "auto":
-            # Use PyTorch for now (ONNX for Qwen2-VL is complex)
-            use_onnx = False
+            # Use ONNX for CPU, PyTorch for GPU
+            use_onnx = (device == "cpu")
         elif backend == "onnx":
             use_onnx = True
         else:  # pytorch
@@ -48,24 +48,22 @@ class QwenOCR:
         
         # Initialize appropriate backend
         if use_onnx:
-            if not onnx_model_path:
-                raise ValueError("onnx_model_path must be provided when using ONNX backend")
+            if not onnx_model_name:
+                raise ValueError("onnx_model_name must be provided when using ONNX backend")
             
-            if not os.path.exists(onnx_model_path):
-                raise ValueError(
-                    f"ONNX model not found at {onnx_model_path}. "
-                    f"Please run convert_to_onnx.py first to create the ONNX model."
-                )
+            print(f"🚀 Loading ONNX model from HuggingFace: {onnx_model_name}")
             
             from src.backends.qwen_ocr_onnx import QwenOCRONNX
-            self.backend = QwenOCRONNX(onnx_model_path)
+            self.backend = QwenOCRONNX(onnx_model_name, cache_dir=cache_dir)
             self.backend_name = "ONNX (CPU-optimized)"
         else:
+            print(f"🚀 Loading PyTorch model from HuggingFace: {model_name}")
+            
             from src.backends.qwen_ocr_pytorch import QwenOCRPyTorch
             self.backend = QwenOCRPyTorch(model_name, device, cache_dir=cache_dir)
             self.backend_name = f"PyTorch ({device.upper()})"
         
-        print(f"Using backend: {self.backend_name}")
+        print(f"✓ Backend ready: {self.backend_name}\n")
     
     def recognize_batch(self, images: List[np.ndarray], max_new_tokens: int = 128) -> List[str]:
         """

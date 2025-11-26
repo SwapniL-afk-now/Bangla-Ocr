@@ -14,7 +14,7 @@ class OCRConfig:
     # Model paths
     yolo_model_path: str = "models/yolo/best.pt"
     qwen_model_name: str = "swapnillo/Bangla-OCR-SFT"
-    onnx_model_path: str = "models/qwen_onnx"
+    onnx_model_name: str = "swapnillo/Bangla-OCR-SFT-ONNX"  # ONNX version on HuggingFace
     
     # Model cache directory (for downloaded models)
     models_cache_dir: str = "models/cache"
@@ -32,7 +32,7 @@ class OCRConfig:
     batch_size_cpu: int = 4
     max_new_tokens: int = 128
     
-    # Backend selection
+    # Backend selection (auto = GPU→PyTorch, CPU→ONNX)
     backend: Literal["auto", "pytorch", "onnx"] = "auto"
     
     # Device
@@ -66,5 +66,5 @@ class OCRConfig:
         elif self.backend == "pytorch":
             return False
         else:  # auto
-            # Use PyTorch for now (ONNX conversion for Qwen2-VL is complex)
-            return False
+            # Use ONNX for CPU, PyTorch for GPU
+            return self.device == "cpu"

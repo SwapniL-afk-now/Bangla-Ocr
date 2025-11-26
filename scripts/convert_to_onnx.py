@@ -1,164 +1,176 @@
 """
-Convert Qwen2-VL PyTorch model to ONNX format for CPU optimization.
+Convert Qwen2-VL/Qwen3-VL model to ONNX format for CPU optimization.
+
+This script uses the optimum library to convert the model properly.
 """
-import torch
-import argparse
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
-from pathlib import Path
 import os
+import argparse
+from pathlib import Path
 
 
 def convert_to_onnx(
-    model_name: str,
-    output_dir: str,
-    opset_version: int = 14,
-    validate: bool = True
+    model_name: str = "swapnillo/Bangla-OCR-SFT",
+    output_dir: str = "models/qwen_onnx",
+    hf_token: str = None
 ):
     """
-    Convert Qwen2-VL model to ONNX format.
+    Convert Qwen model to ONNX format.
     
     Args:
         model_name: HuggingFace model name
         output_dir: Directory to save ONNX model
-        opset_version: ONNX opset version
-        validate: Whether to validate the conversion
+        hf_token: HuggingFace token (if model is private)
     """
-    print(f"Converting {model_name} to ONNX format...")
-    print(f"Output directory: {output_dir}")
-    
-    # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Load model
-    print("\n[1/4] Loading PyTorch model...")
-    model = Qwen2VLForConditionalGeneration.from_pretrained(
-        model_name,
-        torch_dtype=torch.float32,  # ONNX works better with float32
-        device_map="cpu"
-    )
-    processor = AutoProcessor.from_pretrained(model_name)
-    
-    model.eval()
-    print("Model loaded successfully")
-    
-    # Prepare dummy inputs
-    print("\n[2/4] Preparing dummy inputs...")
-    dummy_input_ids = torch.randint(0, 1000, (1, 50), dtype=torch.long)
-    dummy_attention_mask = torch.ones(1, 50, dtype=torch.long)
-    dummy_pixel_values = torch.randn(1, 3, 224, 224, dtype=torch.float32)
-    
-    dummy_inputs = {
-        "input_ids": dummy_input_ids,
-        "attention_mask": dummy_attention_mask,
-        # Note: Actual Qwen2-VL inputs may differ
-    }
-    
-    # Export to ONNX
-    print("\n[3/4] Exporting to ONNX...")
-    onnx_path = os.path.join(output_dir, "model.onnx")
-    
     try:
-        torch.onnx.export(
-            model,
-            tuple(dummy_inputs.values()),
-            onnx_path,
-            input_names=list(dummy_inputs.keys()),
-            output_names=["logits"],
-            dynamic_axes={
-                "input_ids": {0: "batch_size", 1: "sequence_length"},
-                "attention_mask": {0: "batch_size", 1: "sequence_length"},
-                "logits": {0: "batch_size", 1: "sequence_length"}
-            },
-            opset_version=opset_version,
-            do_constant_folding=True,
+        from optimum.exporters.onnx import main_export
+        from transformers import AutoConfig
+        
+        print("="*70)
+        print("QWEN MODEL → ONNX CONVERSION")
+        print("="*70)
+        print(f"Model: {model_name}")
+        print(f"Output: {output_dir}")
+        print()
+        
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Set HF token if provided
+        if hf_token:
+            os.environ['HF_TOKEN'] = hf_token
+            print("✓ HuggingFace token set")
+        
+        # Check model config
+        print("Checking model configuration...")
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+        print(f"✓ Model type: {config.model_type}")
+        
+        # Export to ONNX
+        print("\nStarting ONNX export...")
+        print("⚠ This may take 10-20 minutes for large models...")
+        
+        main_export(
+            model_name_or_path=model_name,
+            output=output_dir,
+            task="image-to-text",  # Vision-language task
+            opset=14,  # ONNX opset version
+            device="cpu",  # Export for CPU
+            fp16=False,  # Use FP32 for CPU
+            optimize="O2",  # Optimization level
         )
-        print(f"ONNX model saved to: {onnx_path}")
-    except Exception as e:
-        print(f"\n⚠ WARNING: Full ONNX export failed: {e}")
-        print("\nThis is expected for Qwen2-VL models due to their complexity.")
-        print("Alternative approach: Use optimum library for better ONNX support.")
-        print("\nTry: pip install optimum[exporters]")
-        print("Then: optimum-cli export onnx --model {model_name} {output_dir}")
+        
+        print("\n" + "="*70)
+        print("✓ CONVERSION COMPLETE!")
+        print("="*70)
+        print(f"ONNX model saved to: {output_dir}")
+        print()
+        print("Next steps:")
+        print("1. Test the ONNX model locally")
+        print("2. Upload to HuggingFace (optional)")
+        print()
+        
+        return True
+        
+    except ImportError:
+        print("❌ Error: 'optimum' library not installed")
+        print()
+        print("Install with:")
+        print("  pip install optimum[exporters,onnxruntime]")
+        print()
         return False
+        
+    except Exception as e:
+        print(f"\n❌ Conversion failed: {e}")
+        print()
+        print("Common issues:")
+        print("1. Model architecture not supported by ONNX")
+        print("2. Missing dependencies (install optimum, onnx, onnxruntime)")
+        print("3. Insufficient memory (try on a machine with more RAM)")
+        print()
+        print("Alternative: Use PyTorch CPU mode (slower but works)")
+        return False
+
+
+def upload_to_huggingface(
+    onnx_dir: str,
+    repo_id: str,
+    hf_token: str
+):
+    """
+    Upload ONNX model to HuggingFace Hub.
     
-    # Validate conversion
-    if validate:
-        print("\n[4/4] Validating conversion...")
-        try:
-            import onnx
-            import onnxruntime as ort
-            
-            # Load and check ONNX model
-            onnx_model = onnx.load(onnx_path)
-            onnx.checker.check_model(onnx_model)
-            print("✓ ONNX model is valid")
-            
-            # Test inference
-            session = ort.InferenceSession(onnx_path, providers=['CPUExecutionProvider'])
-            print("✓ ONNX Runtime can load the model")
-            
-        except Exception as e:
-            print(f"⚠ Validation warning: {e}")
-    
-    print("\n" + "="*50)
-    print("Conversion completed!")
-    print(f"ONNX model location: {onnx_path}")
-    print("="*50)
-    
-    return True
+    Args:
+        onnx_dir: Directory containing ONNX model
+        repo_id: HuggingFace repo ID (e.g., "username/model-name-onnx")
+        hf_token: HuggingFace token
+    """
+    try:
+        from huggingface_hub import HfApi, login
+        
+        print("="*70)
+        print("UPLOADING TO HUGGINGFACE")
+        print("="*70)
+        print(f"Source: {onnx_dir}")
+        print(f"Destination: {repo_id}")
+        print()
+        
+        # Login
+        login(token=hf_token)
+        print("✓ Logged in to HuggingFace")
+        
+        # Initialize API
+        api = HfApi()
+        
+        # Create repo
+        api.create_repo(repo_id=repo_id, exist_ok=True, repo_type="model")
+        print(f"✓ Repository created/verified: {repo_id}")
+        
+        # Upload
+        print("\nUploading files...")
+        api.upload_folder(
+            folder_path=onnx_dir,
+            repo_id=repo_id,
+            repo_type="model"
+        )
+        
+        print("\n" + "="*70)
+        print("✓ UPLOAD COMPLETE!")
+        print("="*70)
+        print(f"Model available at: https://huggingface.co/{repo_id}")
+        print()
+        
+        return True
+        
+    except Exception as e:
+        print(f"\n❌ Upload failed: {e}")
+        return False
 
 
 def main():
-    """Main CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Convert Qwen2-VL PyTorch model to ONNX format"
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default="Qwen/Qwen2-VL-2B-Instruct",
-        help="HuggingFace model name (default: Qwen/Qwen2-VL-2B-Instruct)"
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="models/qwen_onnx",
-        help="Output directory for ONNX model (default: models/qwen_onnx)"
-    )
-    parser.add_argument(
-        "--opset_version",
-        type=int,
-        default=14,
-        help="ONNX opset version (default: 14)"
-    )
-    parser.add_argument(
-        "--no_validate",
-        action="store_true",
-        help="Skip validation step"
-    )
+    parser = argparse.ArgumentParser(description="Convert Qwen model to ONNX")
+    parser.add_argument("--model", default="swapnillo/Bangla-OCR-SFT", help="HuggingFace model name")
+    parser.add_argument("--output", default="models/qwen_onnx", help="Output directory")
+    parser.add_argument("--hf_token", default=None, help="HuggingFace token")
+    parser.add_argument("--upload", action="store_true", help="Upload to HuggingFace after conversion")
+    parser.add_argument("--repo_id", default=None, help="HF repo ID for upload (e.g., username/model-onnx)")
     
     args = parser.parse_args()
     
-    # Print alternative method notice
-    print("\n" + "="*50)
-    print("ONNX Conversion Tool for Qwen2-VL")
-    print("="*50)
-    print("\nNOTE: Qwen2-VL models are complex and may require the 'optimum' library")
-    print("for proper ONNX export. If this script fails, please use:")
-    print("\n  pip install optimum[exporters]")
-    print(f"  optimum-cli export onnx --model {args.model_name} {args.output_dir}")
-    print("\n" + "="*50 + "\n")
+    # Convert
+    success = convert_to_onnx(args.model, args.output, args.hf_token)
     
-    # Attempt conversion
-    success = convert_to_onnx(
-        model_name=args.model_name,
-        output_dir=args.output_dir,
-        opset_version=args.opset_version,
-        validate=not args.no_validate
-    )
-    
-    if not success:
-        print("\nPlease use the optimum library method shown above.")
+    # Upload if requested
+    if success and args.upload:
+        if not args.repo_id:
+            print("❌ Error: --repo_id required for upload")
+            print("Example: --repo_id swapnillo/Bangla-OCR-SFT-ONNX")
+            return
+        
+        if not args.hf_token:
+            print("❌ Error: --hf_token required for upload")
+            return
+        
+        upload_to_huggingface(args.output, args.repo_id, args.hf_token)
 
 
 if __name__ == "__main__":

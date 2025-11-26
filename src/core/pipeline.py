@@ -37,7 +37,7 @@ class BanglaOCRPipeline:
         self.ocr_engine = QwenOCR(
             model_name=config.qwen_model_name,
             backend=config.backend,
-            onnx_model_path=config.onnx_model_path,
+            onnx_model_name=config.onnx_model_name,
             device=config.device,
             cache_dir=config.models_cache_dir
         )
