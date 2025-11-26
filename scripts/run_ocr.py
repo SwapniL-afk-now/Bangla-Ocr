@@ -142,27 +142,6 @@ Examples:
     
     # Validate ONNX backend
     if args.backend == "onnx" and not args.onnx_model:
-        parser.error("--onnx_model is required when using --backend=onnx")
-    
-    # Create configuration
-    config = OCRConfig(
-        yolo_model_path=args.yolo_model,
-        qwen_model_name=args.model_name,
-        onnx_model_path=args.onnx_model or "models/qwen_onnx",
-        output_dir=args.output_dir,
-        yolo_confidence=args.confidence,
-        backend=args.backend,
-    )
-    
-    # Override batch size if specified
-    if args.batch_size:
-        config.batch_size_gpu = args.batch_size
-        config.batch_size_cpu = args.batch_size
-    
-    # Get image files
-    print("Scanning for images...")
-    image_files = get_image_files(args.image)
-    print(f"Found {len(image_files)} image(s) to process\n")
     
     if not image_files:
         print("No images found!")
